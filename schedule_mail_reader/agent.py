@@ -47,7 +47,7 @@ _auth_config = AuthConfig(
 
 # ── ツール定義 ─────────────────────────────────────────────────────────
 
-# 
+
 def authenticate(tool_context: ToolContext) -> dict:
     """Google アカウントの OAuth 認証を行う。
 
@@ -60,28 +60,27 @@ def authenticate(tool_context: ToolContext) -> dict:
             - {"status": "ok", "message": "..."} : 認証済み、または認証完了
             - {"status": "auth_required", "message": "..."} : 認可 URL を送信してターン停止
     """
+    # 関数の `docstring` は単なるコメントではなく、Agent に向けたツールの説明文
+    # Agent はこの `docstring` と引数の型ヒントを解析して、ツールの使い方を理解する
+
     # tool_context.stateはセッション内でエージェント、ツールが互いに値を共有できるキーバリューストア
     # tool_context.state["key"]=valueで値を格納し、tool_context.state.get["key"]で値を取り出す
-    
+
     # 既に認証済みかどうかのチェック
     if tool_context.state.get("access_token"):
         return {"status": "ok", "message": "認証済みです。"}
 
-    # get_auth_response は OAuth コールバック完了後にトークンを返す。初回は None。
+    # ADK が保持しているトークンを取得する（未認可の場合は None）
     auth_response = tool_context.get_auth_response(_auth_config)
-    if (
-        auth_response is None
-        or not getattr(auth_response, "oauth2", None)
-        or not auth_response.oauth2.access_token
-    ):
-        # 認可 URL をフロントに送信してターンを一時停止する。
-        # ユーザーが認可完了後、ADK がこのツールを再実行する。
+    if not auth_response or not auth_response.oauth2.access_token:
+        # トークンがない場合は認可URLをユーザーに提示して認可を促す
         tool_context.request_credential(_auth_config)
         return {
             "status": "auth_required",
             "message": "Google アカウントの認証が必要です。表示された認可 URL にアクセスしてください。",
         }
 
+    # 取得したトークンを state に保存（他のツールから参照できるようにする）
     tool_context.state["access_token"] = auth_response.oauth2.access_token
     return {"status": "ok", "message": "認証が完了しました。"}
 
@@ -92,7 +91,6 @@ def search_schedule_emails(days: int, tool_context: ToolContext) -> dict:
 
     日程・曜日・時間・打ち合わせ関連のキーワードで OR 検索を行い、
     直近 days 日以内に受信したメッセージを対象とする。
-    検索はメッセージ単位のため、スレッド内の他のメッセージはヒットしない点に注意。
 
     Args:
         days: 検索対象とする日数。1 を指定すると直近1日分を検索する。
@@ -129,12 +127,13 @@ def search_schedule_emails(days: int, tool_context: ToolContext) -> dict:
         " OR 打ち合わせ OR ミーティング OR 定例 OR 会議"
     )
     
-    # 上記の上限に基づいて、Gmailメッセージ取得API実行
+    # 上記の条件に基づいて、対象メールのメッセージID一覧を取得
+    # 利用API：Method: users.messages.list
+    # https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list?hl=ja
     resp = requests.get(
         "https://gmail.googleapis.com/gmail/v1/users/me/messages",
         headers={"Authorization": f"Bearer {token}"},
         params={"q": f"({keywords}) after:{since}"},
-        timeout=10,
     )
     if resp.status_code != 200:
         return {"status": "error", "message": f"Gmail API エラー ({resp.status_code}): {resp.text[:300]}"}
@@ -144,44 +143,28 @@ def search_schedule_emails(days: int, tool_context: ToolContext) -> dict:
     if not messages:
         return {"status": "not_found", "message": f"直近{days}日以内に日程調整関連のメールが見つかりませんでした。"}
 
+    # messagesに含まれるidをリスト化して返す
     return {"status": "ok", "count": len(messages), "messages": [{"id": m["id"]} for m in messages]}
 
 
-def get_email_content(message_id: str, tool_context: ToolContext) -> dict:
-    """指定したメッセージ ID のメールを Gmail API から取得し、件名・送信者・受信日・本文を返す。
-
-    本文は text/plain パートを MIME 構造から再帰的に探して返す。
-    本文が 3000 文字を超える場合は切り詰める。
+def get_email_contents(message_ids: list[str], tool_context: ToolContext) -> dict:
+    """複数のメッセージ ID のメールを Gmail API から取得し、件名・送信者・受信日・本文の一覧を返す。
 
     Args:
-        message_id: 取得対象のメッセージ ID。search_schedule_emails の返す messages[].id を渡す。
+        message_ids: 取得対象のメッセージ ID のリスト。search_schedule_emails の返す messages[].id を渡す。
 
     Returns:
         dict: 以下のいずれかを返す。
-            - {"status": "ok", "subject": "...", "from": "...", "date": "...", "body": "..."} : 取得成功
-            - {"status": "error", "message": "..."} : トークン未取得または API エラー
+            - {"status": "ok", "emails": [{"subject": "...", "from": "...", "date": "...", "body": "..."}, ...]} : 取得成功
+            - {"status": "error", "message": "..."} : トークン未取得
     """
     token = tool_context.state.get("access_token")
     if not token:
         return {"status": "error", "message": "アクセストークンが state に見つかりません。"}
 
-    resp = requests.get(
-        f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}",
-        headers={"Authorization": f"Bearer {token}"},
-        params={"format": "full"},  # full: ヘッダー・本文・添付情報すべてを返す
-        timeout=10,
-    )
-    if resp.status_code != 200:
-        return {"status": "error", "message": f"Gmail API エラー ({resp.status_code}): {resp.text[:300]}"}
-
-    msg = resp.json()
-    headers_list = msg.get("payload", {}).get("headers", [])
-    subject = next((h["value"] for h in headers_list if h["name"].lower() == "subject"), "(件名なし)")
-    sender = next((h["value"] for h in headers_list if h["name"].lower() == "from"), "(送信者不明)")
-    date = next((h["value"] for h in headers_list if h["name"].lower() == "date"), "")
-
-    # Gmail の本文は MIME のネスト構造で返る。
-    # text/plain パートを再帰的に探して Base64 デコードする。
+    # text/plain(本文)を探し、Base64デコードをするための関数
+    # ※ メッセージ取得APIで返る値はネスト構造となっているため、ネスト構造からtext/plainを探す必要がある
+    # ※また、データはBase64でエンコードされている
     def extract(payload: dict) -> str:
         if payload.get("mimeType") == "text/plain":
             data = payload.get("body", {}).get("data", "")
@@ -190,14 +173,40 @@ def get_email_content(message_id: str, tool_context: ToolContext) -> dict:
                 return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
         return next((t for part in payload.get("parts", []) if (t := extract(part))), "")
 
-    body = extract(msg.get("payload", {}))
-    return {
-        "status": "ok",
-        "subject": subject,
-        "from": sender,
-        "date": date,
-        "body": body[:3000] if len(body) > 3000 else body,  # LLM のコンテキスト長を考慮して切り詰め
-    }
+    # メッセージID一覧に含まれるメッセージIDをもとに各メッセージの値を取得
+    # 利用API：Method: users.messages.get
+    # https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/get?hl=ja
+    emails = []
+    for message_id in message_ids:
+        resp = requests.get(
+            f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"format": "full"},  # full: ヘッダー・本文・添付情報すべてを返す
+        )
+        if resp.status_code != 200:
+            # 1件失敗しても残りを継続する
+            logging.warning("get_email_contents: メッセージ取得失敗 id=%s status=%d", message_id, resp.status_code)
+            continue
+
+        msg = resp.json()
+
+        # ヘッダーは [{"name": "Subject", "value": "..."}, ...] の形式で返るため辞書に変換して参照しやすくする
+        headers_map = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+        subject = headers_map.get("subject", "")
+        sender = headers_map.get("from", "")
+        date = headers_map.get("date", "")
+
+        # payload 内の MIME ネスト構造から text/plain を探し、Base64 デコードして本文テキストを取得する
+        body = extract(msg.get("payload", {}))
+
+        emails.append({
+            "subject": subject,
+            "from": sender,
+            "date": date,
+            "body": body,
+        })
+
+    return {"status": "ok", "emails": emails}
 
 
 # ── エージェント定義 ───────────────────────────────────────────────────────────
@@ -214,7 +223,7 @@ mail_reader_agent = Agent(
         "1. search_schedule_emails ツールでメールを検索する\n"
         "   - ユーザーが「直近N日」と指定した場合はその日数を days に渡す\n"
         "   - 指定がない場合は days=1（デフォルト）を渡す\n"
-        "2. 見つかったメール全件について get_email_content ツールで本文を取得する\n"
+        "2. 見つかったメール全件について get_email_contents ツールで本文を一括取得する\n"
         "3. 各メールが日程調整メールかどうかを推論で判別する\n"
         "   日程調整メールの条件：\n"
         "   - 候補日時・空き時間・都合の確認などが含まれる\n"
@@ -224,7 +233,7 @@ mail_reader_agent = Agent(
         "   要約・フォーマット整形は行わない。次のエージェントが行う。\n"
         "5. 日程調整メールが1件も見つからなかった場合はその旨を出力して終了する"
     ),
-    tools=[search_schedule_emails, get_email_content],
+    tools=[search_schedule_emails, get_email_contents],
 )
 
 # 第2エージェント: mail_reader_agent が絞り込んだ日程調整メールを指定フォーマットで出力する
@@ -253,7 +262,7 @@ summarizer_agent = Agent(
         "- 形式: （オンライン / オフライン / 不明）\n"
         "- 場所: （場所。オンラインの場合は URL など。不明の場合は「不明」）\n"
         "\n"
-        "**【候補日時】**\n"
+        "**【希望日時】**\n"
         "\n"
         "（候補日時が提示されている場合）\n"
         "\n"
