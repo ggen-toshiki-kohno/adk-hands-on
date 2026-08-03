@@ -1,0 +1,5 @@
+google-adk==2.5.0
+google-cloud-aiplatform[agent-engines]==1.157.0
+python-dotenv==1.2.2
+requests>=2.32.0
+authlib>=1.3.0

@@ -1,0 +1,14 @@
+# ADK ローカルセッションDB（会話履歴）
+.adk/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# vscode
+.vscode/
+
+# 個人環境設定ファイル
+.env.example
