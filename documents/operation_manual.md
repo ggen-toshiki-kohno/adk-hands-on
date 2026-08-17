@@ -1,29 +1,14 @@
 # ADK エージェント 利用手順書
 
+## はじめに
 ADK エージェントをローカルで動作確認するための手順を説明します。
 
-<walkthrough-tutorial-duration duration="30"></walkthrough-tutorial-duration>
+<walkthrough-footnote>
+  <walkthrough-next-step-button></walkthrough-next-step-button>
+</walkthrough-footnote>
 
----
 
-## Step 1: 作業環境確認
-### **プロジェクトとアカウントの確認**
-
-1. ターミナルで以下のコマンドを実行します
-
-```bash
-gcloud config list
-```
-
-2. 作業を行うアカウント、GCPプロジェクトが正しいことを確認します
-```
-account = 作業を行うアカウント
-project = 作業を行うGCPプロジェクト
-```
-
----
-
-## Step 2: 必要な API を有効化する
+## Step 1: 必要な API を有効化する
 
 エージェントの動作に必要な Google Cloud API を有効化します。
 
@@ -31,12 +16,12 @@ project = 作業を行うGCPプロジェクト
 
 | API | 用途 |
 |-----|------|
-| Agent Platform API | ADK エージェントの実行・Agent Runtime へのデプロイ |
+| Agent Platform API | ADK エージェントの実行 |
 | Gmail API | メールの検索・本文取得 |
 
 ### **コマンドで一括有効化する**
 
-ターミナルで以下のコマンドを実行します
+ターミナルで以下のコマンドを実行します。
 
 ```bash
 gcloud services enable \
@@ -49,66 +34,43 @@ gcloud services enable \
 
 ---
 
-## Step 3: IAM 権限を確認する
+## Step 2: OAuth 同意画面を設定する
 
-エージェントの実行・デプロイには、実行アカウントに以下のロールが必要です。
-
-### **必要なロール一覧**
-
-| ロール | 用途 |
-|--------|------|
-| `roles/aiplatform.user` | Agent Runtime のデプロイ・管理 |
-
-### **現在のアカウントに付与されているロールを確認する**
-
-```bash
-gcloud projects get-iam-policy $(gcloud config get-value project) \
-  --flatten="bindings[].members" \
-  --filter="bindings.members=$(gcloud config get-value account)" \
-  --format="table(bindings.role)"
-```
-
-上記ロールが表示されない場合は、プロジェクトオーナーに付与を依頼してください。
-
----
-
-## Step 4: OAuth 同意画面を設定する
-
-エージェントが Gmail API にアクセスするために、OAuth 同意画面を設定します。
+エージェントが Gmail API にアクセスするために、OAuth 同意画面を設定します。  
 
 ### **同意画面を開く**
 
 1. [Google Cloud コンソール](https://console.cloud.google.com/) を開きます
 
 2. 検索窓に **`OAuth 同意画面`** と入力して開きます  
-   または: **[APIとサービス]** > **[OAuth 同意画面]**
+> （※）画面を開いた際に「GCPプロジェクト」が別のプロジェクトに切り替わる可能性があります。その場合は作業用のプロジェクトに戻してください。
 
 ### **同意画面を設定する**
+1. サイドメニューの **[概要]** をクリックします
 
-1. ユーザーの種類で **[内部]** を選択し、**[作成]** をクリックします  
-   ※ 社内利用のため「内部」を選択します（「内部」の場合、Google Cloud組織で利用しているドメインのユーザーのみがOAuth認証を行えます）
+2. 「Google Auth Platform はまだ構成されていません」と表示されている場合は[開始]をクリックします
 
-2. 以下の項目を入力します
+3. 以下の項目を入力します
+| 項目 | 入力値 |
+|------|--------|
+| アプリ名 | `ADK Hackathon Agent`（任意） |
+| ユーザーサポートメール | 自身のメールアドレス |
+| 対象 | 内部（※） |
+| 連絡先情報 | 自身のメールアドレス |
+| ポリシーに同意 | ☑ |
+> (※)「内部」の場合、Google Cloud組織で利用しているドメインのユーザーのみがOAuth認証を行えます
 
-   | 項目 | 入力値 |
-   |------|--------|
-   | アプリ名 | `ADK Hackathon Agent`（任意） |
-   | ユーザーサポートメール | 貸与されたアカウントのメールアドレス |
-   | デベロッパーの連絡先情報 | 同上 |
-
-3. **[保存して次へ]** をクリックします
-
-4. 確認画面で内容を確認し、**[ダッシュボードに戻る]** をクリックします
+3. **[作成]** をクリックします
 
 ---
 
-## Step 5: OAuth 2.0 クライアント ID を作成する
+## Step 3: OAuth 2.0 クライアント ID を作成する
 
-### **認証情報の画面を開く**
+### **クライアントを開く**
 
-1. [Google Cloud コンソール](https://console.cloud.google.com/) の **[APIとサービス]** > **[認証情報]** を開きます
+1. OAuth 同意画面のサイドメニューにて **[クライアント]** をクリックします
 
-2. 画面上部の **[+ 認証情報を作成]** > **[OAuth クライアント ID]** をクリックします
+2. 画面上部の **[+ クライアントを作成]** をクリックします
 
 ### **クライアント ID を作成する**
 
@@ -116,45 +78,45 @@ gcloud projects get-iam-policy $(gcloud config get-value project) \
 
 2. 名前に任意の名前を入力します（例: `ADK Hackathon Local`）
 
-3. **[承認済みのリダイレクト URI]** の **[+ URIを追加]** をクリックし、以下の URI を追加します
+3. **[承認済みのリダイレクト URI]** の **[+ URIを追加]** を選択します（後ほど設定）
+> ⚠️ **注意：ここでは設定しません。**  
+>ローカル環境で作業する場合、以下の`adk web`の画面URLを設定すれば良いです。
+   >```
+   >http://127.0.0.1:8000/dev-ui/ 
+   >```
+>ただ今回は、Cloud Shell（別サーバー）上で`adk web`を実施します。  
+>この際、`127.0.0.1`のままだと、Cloud Shellではなく自身のPC側を指してしまうため、Cloud Shellはlocalhostの通信を、Googleが用意する一時的なアドレスに転送します。  
+>上記より、実際に`adk web`をCloud Shellで起動して、転送先のURLが分かったタイミングで設定が必要になります。
 
-   ```
-   http://127.0.0.1:8000/dev-ui/
-   ```
 
-   > **このリダイレクト URI について**  
-   > `adk web` のフロントエンドは `http://127.0.0.1:8000/dev-ui/` をコールバック先として使います。  
-   > `localhost` と `127.0.0.1` は Google OAuth では別ホスト扱いになるため、**`127.0.0.1`** を使用してください。  
-   > この URI が登録されていないと、認証後に「このアプリは OAuth 2.0 ポリシーを遵守していない」エラーになるため必ず追加してください。
+> **このリダイレクト URI について**  
+> `adk web` の画面の URL から OAuth 認証を行うことを許可するための設定です。
+> 
+> 正確には、Google での認証完了後にアクセストークン等を受け取る「安全なリダイレクト先（戻り先）」として、この URL を許可しています。
 
 4. **[作成]** をクリックします
 
-### **クライアント ID とシークレットを控える**
-
-作成完了後にダイアログが表示されます。
+5. 作成完了後にダイアログが表示され、以下の情報をメモしておきます。
 
 - **クライアント ID**（`xxxxxxxx.apps.googleusercontent.com` の形式）
 - **クライアントシークレット**
 
-この 2 つの値を必ずメモしておきます（次の手順で `.env` に設定します）。
-
-> ダイアログを閉じた後は、認証情報の一覧から該当のクライアントをクリックすれば再確認できます。
 
 ---
 
-## Step 6: エージェントフォルダへ移動する
+## Step 4: エージェントフォルダへ移動する
 
 次のコマンドを実行して、エージェントのフォルダへ移動します。
 
 ```bash
-cd adk-hackathon/schedule_mail_reader && ls
+cd schedule_mail_reader
 ```
 
 > **以降のすべてのコマンドは、このディレクトリ（`schedule_mail_reader/`）で実行します。**
 
 ---
 
-## Step 7: 仮想環境を作成・有効化する
+## Step 5: 仮想環境を作成・有効化する
 
 Python の仮想環境を作成し、有効化します。
 
@@ -171,12 +133,12 @@ source .venv/bin/activate
 
 ---
 
-## Step 8: 環境設定ファイルを更新
+## Step 6: 環境設定ファイルを更新
 
 以下をクリックして`.env` ファイルを開きます
 
 
-<walkthrough-editor-open-file filePath="adk-hackathon/schedule_mail_reader/.env">
+<walkthrough-editor-open-file filePath="adk-hands-on/schedule_mail_reader/.env">
 .env ファイルを開く
 </walkthrough-editor-open-file>
 
@@ -187,8 +149,8 @@ source .venv/bin/activate
 | 項目 | 設定値 |
 |------|--------|
 | `GOOGLE_CLOUD_PROJECT` | 使用する GCP プロジェクト ID |
-| `GOOGLE_OAUTH_CLIENT_ID` | Step 4 で控えたクライアント ID |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Step 4 で控えたクライアントシークレット |
+| `GOOGLE_OAUTH_CLIENT_ID` | Step 3 で控えたクライアント ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Step 3 で控えたクライアントシークレット |
 
 書き換え例:
 
@@ -202,7 +164,7 @@ GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxx
 
 ---
 
-## Step 9: 依存パッケージをインストールする
+## Step 7: 依存パッケージをインストールする
 
 次のコマンドを実行して、仮想環境内に必要なパッケージをインストールします。
 
@@ -212,7 +174,7 @@ pip install -r requirements.txt
 
 ---
 
-## Step 10: エージェントの動作をローカルで確認する（起動）
+## Step 8: エージェントの動作をローカルで確認する（起動）
 
 次のコマンドを実行して、ローカル上で動作確認用 Web アプリを起動します。
 
@@ -226,27 +188,32 @@ adk web . --allow_origins "regex:https://.*\.cloudshell\.dev"
 
 ---
 
-## Step 11: ブラウザでエージェントの動作を確認する
+## Step 9: エージェントのURLを[承認済みのリダイレクト URI]に追加
 
-1. ブラウザで以下の URL を開きます
+1. ターミナル上に`adk web`へのアクセスURL（http://127.0.0.1:8000/）が表示されるので、`Ctrl + クリック`で開きます
 
-   ```
-   http://127.0.0.1:8000
-   ```
+2. ブラウザのURL欄から`https://~dev-ui/`までの文字列をコピーします  
+例）`https://8000-cs-924648547011-default.cs-asia-east1-cats.cloudshell.dev/dev-ui/`
 
-2. 画面下部の入力欄 **[Type a message...]** にメッセージを入力します
-
-   ```
-   日程調整メールを確認して
-   ```
-
-3. 初回実行時は Google アカウントの認証を求めるメッセージが表示されます。表示された認可 URL にアクセスし、Google アカウントでログインして権限を許可してください
-
-4. エージェントの応答を確認します（候補日時・参加者・議題が要約されて返ってきます）
+3. Step 3:で作成した **OAuth 2.0 クライアント ID** にて **[承認済みのリダイレクト URI]** にコピーした文字列を追加して保存します。
 
 ---
 
-## Step 12: adk web を停止する
+## Step 10: ブラウザでエージェントの動作を確認する
+
+1. `adk web`の画面下部の入力欄 **[Type a message...]** にメッセージを入力します
+
+   ```
+   直近3日間の日程調整メールを確認して
+   ```
+
+2. 初回実行時は Google アカウントの認証を求めるメッセージが表示されます。表示された認可 URL にアクセスし、Google アカウントでログインして権限を許可してください
+
+3. エージェントの応答を確認します（候補日時・参加者・議題が要約されて返ってきます）
+
+---
+
+## Step 11: adk web を停止する
 
 動作確認が完了したら、ターミナルで以下のキー操作を行い `adk web` を停止します。
 
