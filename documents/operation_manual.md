@@ -60,7 +60,7 @@ gcloud services enable \
 | ポリシーに同意 | ☑ |
 > (※)「内部」の場合、Google Cloud組織で利用しているドメインのユーザーのみがOAuth認証を行えます
 
-3. **[作成]** をクリックします
+4. **[作成]** をクリックします
 
 ---
 
@@ -78,25 +78,9 @@ gcloud services enable \
 
 2. 名前に任意の名前を入力します（例: `ADK Hackathon Local`）
 
-3. **[承認済みのリダイレクト URI]** の **[+ URIを追加]** を選択します（後ほど設定）
-> ⚠️ **注意：ここでは設定しません。**  
->ローカル環境で作業する場合、以下の`adk web`の画面URLを設定すれば良いです。
-   >```
-   >http://127.0.0.1:8000/dev-ui/ 
-   >```
->ただ今回は、Cloud Shell（別サーバー）上で`adk web`を実施します。  
->この際、`127.0.0.1`のままだと、Cloud Shellではなく自身のPC側を指してしまうため、Cloud Shellはlocalhostの通信を、Googleが用意する一時的なアドレスに転送します。  
->上記より、実際に`adk web`をCloud Shellで起動して、転送先のURLが分かったタイミングで設定が必要になります。
+3. **[作成]** をクリックします
 
-
-> **このリダイレクト URI について**  
-> `adk web` の画面の URL から OAuth 認証を行うことを許可するための設定です。
-> 
-> 正確には、Google での認証完了後にアクセストークン等を受け取る「安全なリダイレクト先（戻り先）」として、この URL を許可しています。
-
-4. **[作成]** をクリックします
-
-5. 作成完了後にダイアログが表示され、以下の情報をメモしておきます。
+4. 作成完了後にダイアログが表示され、以下の情報をメモしておきます。
 
 - **クライアント ID**（`xxxxxxxx.apps.googleusercontent.com` の形式）
 - **クライアントシークレット**
@@ -104,36 +88,7 @@ gcloud services enable \
 
 ---
 
-## Step 4: エージェントフォルダへ移動する
-
-次のコマンドを実行して、エージェントのフォルダへ移動します。
-
-```bash
-cd schedule_mail_reader
-```
-
-> **以降のすべてのコマンドは、このディレクトリ（`schedule_mail_reader/`）で実行します。**
-
----
-
-## Step 5: 仮想環境を作成・有効化する
-
-Python の仮想環境を作成し、有効化します。
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-プロンプトの先頭に `(.venv)` が表示されれば、仮想環境が有効化されています。
-
-```
-(.venv) [アカウント名]@cloudshell:~/adk-hackathon/schedule_mail_reader ([プロジェクトID])$
-```
-
----
-
-## Step 6: 環境設定ファイルを更新
+## Step 4: 環境設定ファイルを更新
 
 以下をクリックして`.env` ファイルを開きます
 
@@ -164,7 +119,32 @@ GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxx
 
 ---
 
-## Step 7: 依存パッケージをインストールする
+
+## Step 5: 仮想環境を作成・有効化する
+
+1. 次のコマンドを実行して、エージェントのフォルダへ移動します。
+
+```bash
+cd schedule_mail_reader
+```
+
+2. Python の仮想環境を作成し、有効化します。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+プロンプトの先頭に `(.venv)` が表示されれば、仮想環境が有効化されています。
+
+```
+(.venv) [アカウント名]@cloudshell:~/adk-hackathon/schedule_mail_reader ([プロジェクトID])$
+```
+
+
+---
+
+## Step 6: 依存パッケージをインストールする
 
 次のコマンドを実行して、仮想環境内に必要なパッケージをインストールします。
 
@@ -174,7 +154,7 @@ pip install -r requirements.txt
 
 ---
 
-## Step 8: エージェントの動作をローカルで確認する（起動）
+## Step 7: エージェントの動作をローカルで確認する（起動）
 
 次のコマンドを実行して、ローカル上で動作確認用 Web アプリを起動します。
 
@@ -188,7 +168,7 @@ adk web . --allow_origins "regex:https://.*\.cloudshell\.dev"
 
 ---
 
-## Step 9: エージェントのURLを[承認済みのリダイレクト URI]に追加
+## Step 8: エージェントのURLを[承認済みのリダイレクト URI]に追加
 
 1. ターミナル上に`adk web`へのアクセスURL（http://127.0.0.1:8000/）が表示されるので、`Ctrl + クリック`で開きます
 
@@ -197,9 +177,16 @@ adk web . --allow_origins "regex:https://.*\.cloudshell\.dev"
 
 3. Step 3:で作成した **OAuth 2.0 クライアント ID** にて **[承認済みのリダイレクト URI]** にコピーした文字列を追加して保存します。
 
+> **承認済みリダイレクト URI について**  
+> `adk web` の画面の URL から OAuth 認証を行うことを許可するための設定です。
+> 
+> Google での認証完了後にアクセストークンを受け取る「安全なリダイレクト先（戻り先）」として、この URL を許可しています。
+
+
+
 ---
 
-## Step 10: ブラウザでエージェントの動作を確認する
+## Step 9: ブラウザでエージェントの動作を確認する
 
 1. `adk web`の画面下部の入力欄 **[Type a message...]** にメッセージを入力します
 
@@ -213,7 +200,7 @@ adk web . --allow_origins "regex:https://.*\.cloudshell\.dev"
 
 ---
 
-## Step 11: adk web を停止する
+## Step 10: adk web を停止する
 
 動作確認が完了したら、ターミナルで以下のキー操作を行い `adk web` を停止します。
 
@@ -318,9 +305,9 @@ GOOGLE_OAUTH_CLIENT_SECRET=...   # 削除
 
 **⑦ Google Cloud Console の OAuth クライアント設定でリダイレクト URI を変更する**
 
-[APIとサービス] > [認証情報] で Step 5 で作成した OAuth クライアントを開き、承認済みのリダイレクト URI を以下に変更します。
+[APIとサービス] > [認証情報] で Step 3 で作成した OAuth クライアントを開き、承認済みのリダイレクト URI を以下に変更します。
 
 | 変更前 | 変更後 |
 |--------|--------|
-| `http://127.0.0.1:8000/dev-ui/` | `https://vertexaisearch.cloud.google.com/oauth-redirect` |
+| `https://~/dev-ui/` | `https://vertexaisearch.cloud.google.com/oauth-redirect` |
 
