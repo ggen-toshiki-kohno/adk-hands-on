@@ -15,7 +15,7 @@ Gmail で取得した候補日時をもとに、カレンダーの空き状況�
 以下コマンドをCloud Shellで実行してCalendar API を有効化します。
 ```bash
 gcloud services enable \
-  calendar.googleapis.com \
+  calendar-json.googleapis.com \
   --project=$(gcloud config get-value project)
 ```
 
